@@ -1,12 +1,66 @@
-from pandas import Series, DataFrame
+import sys
+from PyQt5.QtWidgets import *
+from PyQt5 import uic
+from PyQt5.QtCore import *
+import pybithumb
+import time
 
-data = {"open": [737, 750], "high": [755, 780], "low": [700, 710], "close": [750, 770]} 
-df = DataFrame(data) 
-s = Series([300, 400])  #DataFrame에 추가할 Series 객체를 생성
-df["volume"] = s        #DataFrame에 volume이란 이름으로 Series 객체를 추가
-print(df)
-df.loc[2] = (100, 200, 300, 400, 500)   #행을 추가할 때는 loc를 사용해서 행의 이름과 데이터를 튜플 혹은 리스트로 넘겨주면 됩
-print(df)
-upper = df["open"] * 1.3
-df["upper"] = upper
-print(df)
+tickers = ["BTC", "ETH", "BCH", "ETC"]
+form_class = uic.loadUiType("bull.ui")[0]
+
+class Worker(QThread):
+    finished = pyqtSignal(dict)
+
+    def run(self):
+        while True:
+            data = {}
+
+            for ticker in tickers:
+                data[ticker] = self.get_market_infos(ticker)
+
+            self.finished.emit(data)
+            time.sleep(2)
+
+    def get_market_infos(self, ticker):
+        try:
+            df = pybithumb.get_ohlcv(ticker)
+            ma5 = df['close'].rolling(window=5).mean()
+            last_ma5 = ma5[-2]
+            price = pybithumb.get_current_price(ticker)
+
+            state = None
+            if price > last_ma5:
+                state = "상승장"
+            else:
+                state = "하락장"
+
+            return price, last_ma5, state
+        except:
+            return None, None, None
+
+class MyWindow(QMainWindow, form_class):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+        self.worker = Worker()
+        self.worker.finished.connect(self.update_table_widget)
+        self.worker.start()
+
+    @pyqtSlot(dict)
+    def update_table_widget(self, data):
+        try:
+            for ticker, infos in data.items():
+                index = tickers.index(ticker)
+
+                self.tableWidget.setItem(index, 0, QTableWidgetItem(ticker))
+                self.tableWidget.setItem(index, 1, QTableWidgetItem(str(infos[0])))
+                self.tableWidget.setItem(index, 2, QTableWidgetItem(str(infos[1])))
+                self.tableWidget.setItem(index, 3, QTableWidgetItem(str(infos[2])))
+        except:
+            pass
+
+app = QApplication(sys.argv)
+window = MyWindow()
+window.show()
+app.exec_()
