@@ -1,66 +1,24 @@
-import sys
-from PyQt5.QtWidgets import *
-from PyQt5 import uic
-from PyQt5.QtCore import *
 import pybithumb
 import time
 
-tickers = ["BTC", "ETH", "BCH", "ETC"]
-form_class = uic.loadUiType("bull.ui")[0]
+con_key = "90634f4f04183c3d5fbb3960566df585"
+sec_key = "b60e48d7b12d41725bc9b5506670a7b3"
 
-class Worker(QThread):
-    finished = pyqtSignal(dict)
+bithumb = pybithumb.Bithumb(con_key, sec_key)
+for ticker in pybithumb.get_tickers() :
+    balance = bithumb.get_balance(ticker)
+    print(ticker, ":", format(balance[0],'f'))
+    time.sleep(0.1)
 
-    def run(self):
-        while True:
-            data = {}
-
-            for ticker in tickers:
-                data[ticker] = self.get_market_infos(ticker)
-
-            self.finished.emit(data)
-            time.sleep(2)
-
-    def get_market_infos(self, ticker):
-        try:
-            df = pybithumb.get_ohlcv(ticker)
-            ma5 = df['close'].rolling(window=5).mean()
-            last_ma5 = ma5[-2]
-            price = pybithumb.get_current_price(ticker)
-
-            state = None
-            if price > last_ma5:
-                state = "상승장"
-            else:
-                state = "하락장"
-
-            return price, last_ma5, state
-        except:
-            return None, None, None
-
-class MyWindow(QMainWindow, form_class):
-    def __init__(self):
-        super().__init__()
-        self.setupUi(self)
-
-        self.worker = Worker()
-        self.worker.finished.connect(self.update_table_widget)
-        self.worker.start()
-
-    @pyqtSlot(dict)
-    def update_table_widget(self, data):
-        try:
-            for ticker, infos in data.items():
-                index = tickers.index(ticker)
-
-                self.tableWidget.setItem(index, 0, QTableWidgetItem(ticker))
-                self.tableWidget.setItem(index, 1, QTableWidgetItem(str(infos[0])))
-                self.tableWidget.setItem(index, 2, QTableWidgetItem(str(infos[1])))
-                self.tableWidget.setItem(index, 3, QTableWidgetItem(str(infos[2])))
-        except:
-            pass
-
-app = QApplication(sys.argv)
-window = MyWindow()
-window.show()
-app.exec_()
+bcha = bithumb.get_balance("BCHA")
+ltc = bithumb.get_balance("LTC")
+xrp = bithumb.get_balance("XRP")
+bsv = bithumb.get_balance("BSV")
+etc = bithumb.get_balance("ETC")
+bch = bithumb.get_balance("BCH")
+print("비트코인 캐시 에이비씨", format(bcha, 'f'))
+print("라이트코인", ltc)
+print("리픓", xrp)
+print("비트코인네스브이", bsv)
+print("이더리움 클래식", etc)
+print("비트코인 캐시", bch)
